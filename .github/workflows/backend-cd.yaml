@@ -90,26 +90,20 @@ jobs:
         working-directory: starter/backend
     outputs:
       image_uri: ${{ steps.image.outputs.image_uri }}
-      deploy_enabled: ${{ steps.guard.outputs.deploy_enabled }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Check deployment secrets
-        id: guard
+      - name: Verify deployment configuration
         run: |
-          if [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ] && \
-             [ -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ] && \
-             [ -n "${{ secrets.AWS_REGION }}" ] && \
-             [ -n "${{ secrets.BACKEND_ECR_REPOSITORY }}" ] && \
-             [ -n "${{ secrets.EKS_CLUSTER_NAME }}" ]; then
-            echo "deploy_enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "deploy_enabled=false" >> "$GITHUB_OUTPUT"
-          fi
+          test -n "${{ secrets.AWS_ACCESS_KEY_ID }}"
+          test -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+          test -n "${{ secrets.AWS_SESSION_TOKEN }}"
+          test -n "${{ secrets.AWS_REGION }}"
+          test -n "${{ secrets.BACKEND_ECR_REPOSITORY }}"
+          test -n "${{ secrets.EKS_CLUSTER_NAME }}"
 
       - name: Configure AWS credentials
-        if: steps.guard.outputs.deploy_enabled == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -118,7 +112,6 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        if: steps.guard.outputs.deploy_enabled == 'true'
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
@@ -126,7 +119,6 @@ jobs:
         run: docker build --tag=mp-backend:${{ github.sha }} .
 
       - name: Tag image for ECR
-        if: steps.guard.outputs.deploy_enabled == 'true'
         id: image
         run: |
           IMAGE_URI="${{ steps.ecr-login.outputs.registry }}/${BACKEND_ECR_REPOSITORY}:${{ github.sha }}"
@@ -134,14 +126,7 @@ jobs:
           echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
       - name: Push image to ECR
-        if: steps.guard.outputs.deploy_enabled == 'true'
         run: docker push "${{ steps.image.outputs.image_uri }}"
-
-      - name: Record skipped deployment
-        if: steps.guard.outputs.deploy_enabled != 'true'
-        run: |
-          echo "AWS deployment secrets are not configured in this repository."
-          echo "Docker build completed; ECR push and EKS deploy are intentionally skipped."
 
   deploy:
     name: Deploy backend to EKS
@@ -155,7 +140,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
-        if: needs.build.outputs.deploy_enabled == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -170,31 +154,9 @@ jobs:
         uses: imranismail/setup-kustomize@v2
 
       - name: Update kubeconfig
-        if: needs.build.outputs.deploy_enabled == 'true'
         run: aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
 
       - name: Deploy backend manifests
-        if: needs.build.outputs.deploy_enabled == 'true'
         run: |
           kustomize edit set image backend=${{ needs.build.outputs.image_uri }}
           kustomize build . | kubectl apply -f -
-
-      - name: Validate backend manifests when deployment secrets are unavailable
-        if: needs.build.outputs.deploy_enabled != 'true'
-        run: |
-          echo "AWS/EKS deployment secrets are not configured for this public training repo."
-          echo "Running the deployment job with offline Kubernetes manifest validation."
-          kustomize build . > /tmp/backend-manifests.yaml
-          python - <<'PY'
-          import sys
-          from pathlib import Path
-          import yaml
-
-          docs = [doc for doc in yaml.safe_load_all(Path('/tmp/backend-manifests.yaml').read_text()) if doc]
-          kinds = {doc.get('kind') for doc in docs}
-          expected = {'Deployment', 'Service'}
-          missing = expected - kinds
-          if missing:
-              raise SystemExit(f'Missing backend Kubernetes resources: {sorted(missing)}')
-          print('Validated backend Kubernetes manifests:', ', '.join(sorted(kinds)))
-          PY

@@ -42,9 +42,9 @@ The latest successful GitHub Actions runs at resubmission time are:
 Pull request used to prove the required `pull_request` CI trigger:
 https://github.com/LeoLin990405/movie-picture-pipeline/pull/1
 
-The CD workflows now keep the `Deploy frontend to EKS` and `Deploy backend to EKS`
-jobs active even when AWS/EKS training secrets are unavailable in the public
-repository. When secrets are configured, those jobs update kubeconfig and apply
-the kustomize manifests to EKS. When secrets are not configured, the same deploy
-jobs perform offline Kubernetes manifest validation so reviewers can verify that
-the deploy stage runs instead of being skipped.
+The CD workflows now require the deployment secrets and do not include an
+offline deployment fallback. If AWS/ECR/EKS secrets are missing, the workflow
+fails in the `Verify deployment configuration` step. With secrets configured,
+the jobs authenticate to AWS, log in to ECR, push the built image to ECR, update
+the EKS kubeconfig, and run `kustomize build . | kubectl apply -f -` against
+the configured EKS cluster.
