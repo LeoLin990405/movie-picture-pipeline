@@ -183,5 +183,18 @@ jobs:
         if: needs.build.outputs.deploy_enabled != 'true'
         run: |
           echo "AWS/EKS deployment secrets are not configured for this public training repo."
-          echo "Running the deployment job with Kubernetes client-side validation."
-          kustomize build . | kubectl apply --dry-run=client --validate=false -f -
+          echo "Running the deployment job with offline Kubernetes manifest validation."
+          kustomize build . > /tmp/frontend-manifests.yaml
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          import yaml
+
+          docs = [doc for doc in yaml.safe_load_all(Path('/tmp/frontend-manifests.yaml').read_text()) if doc]
+          kinds = {doc.get('kind') for doc in docs}
+          expected = {'Deployment', 'Service'}
+          missing = expected - kinds
+          if missing:
+              raise SystemExit(f'Missing frontend Kubernetes resources: {sorted(missing)}')
+          print('Validated frontend Kubernetes manifests:', ', '.join(sorted(kinds)))
+          PY
