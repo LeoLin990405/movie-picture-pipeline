@@ -29,3 +29,12 @@ Equivalent screenshots for the requested working URLs are included in `submissio
 - `backend-api-movies.png` shows the backend `/movies` endpoint returning the list of movies.
 - `frontend-movie-list.png` shows the frontend rendering the movie list returned by the backend.
 - `github-actions-workflows.png` summarizes the implemented workflow coverage for reviewer convenience.
+
+## GitHub Actions Verification
+
+The latest successful GitHub Actions runs at submission time are:
+
+- Frontend CI: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26155289007
+- Frontend CD: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26155288997
+- Backend CI: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26155486739
+- Backend CD: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26155486815

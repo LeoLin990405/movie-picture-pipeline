@@ -31,7 +31,9 @@ the ECR/EKS deployment steps:
 Submission evidence is stored under `submission/`, including screenshots that
 show the backend returning the movie JSON and the frontend rendering the movie
 list. These screenshots are provided as equivalent verification evidence for
-the working URLs requested on the submission page.
+the working URLs requested on the submission page. The submission notes also
+include links to the latest successful GitHub Actions runs for all four
+required workflows.
 
 You've been brought on as the DevOps resource for a development team that manages a web application that is a catalog of Movie Picture movies. They're in dire need of automating their development workflows in hopes of accelerating their release cycle. They'd like to use Github Actions to automate testing, building and deploying their applications to an existing Kubernetes cluster.
 
