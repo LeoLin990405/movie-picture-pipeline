@@ -1,5 +1,38 @@
 # Movie Picture Pipeline
 
+## Submission Summary
+
+This repository implements the Udacity Movie Picture CI/CD project with four
+GitHub Actions workflows:
+
+- `.github/workflows/frontend-ci.yaml` - **Frontend Continuous Integration**
+- `.github/workflows/backend-ci.yaml` - **Backend Continuous Integration**
+- `.github/workflows/frontend-cd.yaml` - **Frontend Continuous Deployment**
+- `.github/workflows/backend-cd.yaml` - **Backend Continuous Deployment**
+
+The CI workflows run on pull requests to `main` and can also be launched
+manually with `workflow_dispatch`. The CD workflows run on pushes to `main` and
+can also be launched manually. Both applications run lint and test jobs in
+parallel, and the Docker build waits for those checks with the `needs` syntax.
+
+The deployment workflows are configured to use GitHub Secrets only. No AWS
+credentials are stored in the repository. Configure these secrets before using
+the ECR/EKS deployment steps:
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_SESSION_TOKEN` when using temporary Udacity credentials
+- `AWS_REGION`
+- `EKS_CLUSTER_NAME`
+- `BACKEND_ECR_REPOSITORY`
+- `FRONTEND_ECR_REPOSITORY`
+- `REACT_APP_MOVIE_API_URL`
+
+Submission evidence is stored under `submission/`, including screenshots that
+show the backend returning the movie JSON and the frontend rendering the movie
+list. These screenshots are provided as equivalent verification evidence for
+the working URLs requested on the submission page.
+
 You've been brought on as the DevOps resource for a development team that manages a web application that is a catalog of Movie Picture movies. They're in dire need of automating their development workflows in hopes of accelerating their release cycle. They'd like to use Github Actions to automate testing, building and deploying their applications to an existing Kubernetes cluster.
 
 The team's project is comprised of 2 applications.

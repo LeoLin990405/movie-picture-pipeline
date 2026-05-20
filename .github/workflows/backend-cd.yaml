@@ -1,0 +1,178 @@
+name: Backend Continuous Deployment
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "starter/backend/**"
+      - ".github/workflows/backend-cd.yaml"
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+  BACKEND_ECR_REPOSITORY: ${{ secrets.BACKEND_ECR_REPOSITORY }}
+
+jobs:
+  lint:
+    name: Lint backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: starter/backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Restore pipenv cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/virtualenvs
+          key: backend-pipenv-${{ runner.os }}-${{ hashFiles('starter/backend/Pipfile.lock') }}
+          restore-keys: |
+            backend-pipenv-${{ runner.os }}-
+
+      - name: Install pipenv
+        run: python -m pip install --upgrade pip pipenv
+
+      - name: Install dependencies
+        run: pipenv install --dev --deploy
+
+      - name: Run lint
+        run: pipenv run lint
+
+  test:
+    name: Test backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: starter/backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Restore pipenv cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/virtualenvs
+          key: backend-pipenv-${{ runner.os }}-${{ hashFiles('starter/backend/Pipfile.lock') }}
+          restore-keys: |
+            backend-pipenv-${{ runner.os }}-
+
+      - name: Install pipenv
+        run: python -m pip install --upgrade pip pipenv
+
+      - name: Install dependencies
+        run: pipenv install --dev --deploy
+
+      - name: Run tests
+        run: pipenv run test
+
+  build:
+    name: Build and push backend image
+    runs-on: ubuntu-latest
+    needs:
+      - lint
+      - test
+    defaults:
+      run:
+        working-directory: starter/backend
+    outputs:
+      image_uri: ${{ steps.image.outputs.image_uri }}
+      deploy_enabled: ${{ steps.guard.outputs.deploy_enabled }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check deployment secrets
+        id: guard
+        run: |
+          if [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ] && \
+             [ -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ] && \
+             [ -n "${{ secrets.AWS_REGION }}" ] && \
+             [ -n "${{ secrets.BACKEND_ECR_REPOSITORY }}" ] && \
+             [ -n "${{ secrets.EKS_CLUSTER_NAME }}" ]; then
+            echo "deploy_enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy_enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials
+        if: steps.guard.outputs.deploy_enabled == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        if: steps.guard.outputs.deploy_enabled == 'true'
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        run: docker build --tag=mp-backend:${{ github.sha }} .
+
+      - name: Tag image for ECR
+        if: steps.guard.outputs.deploy_enabled == 'true'
+        id: image
+        run: |
+          IMAGE_URI="${{ steps.ecr-login.outputs.registry }}/${BACKEND_ECR_REPOSITORY}:${{ github.sha }}"
+          docker tag mp-backend:${{ github.sha }} "$IMAGE_URI"
+          echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+
+      - name: Push image to ECR
+        if: steps.guard.outputs.deploy_enabled == 'true'
+        run: docker push "${{ steps.image.outputs.image_uri }}"
+
+      - name: Record skipped deployment
+        if: steps.guard.outputs.deploy_enabled != 'true'
+        run: |
+          echo "AWS deployment secrets are not configured in this repository."
+          echo "Docker build completed; ECR push and EKS deploy are intentionally skipped."
+
+  deploy:
+    name: Deploy backend to EKS
+    runs-on: ubuntu-latest
+    needs: build
+    if: needs.build.outputs.deploy_enabled == 'true'
+    defaults:
+      run:
+        working-directory: starter/backend/k8s
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Setup kustomize
+        uses: imranismail/setup-kustomize@v2
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
+
+      - name: Deploy backend manifests
+        run: |
+          kustomize edit set image backend=${{ needs.build.outputs.image_uri }}
+          kustomize build . | kubectl apply -f -
