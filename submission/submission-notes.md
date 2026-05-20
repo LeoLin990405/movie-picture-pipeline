@@ -32,9 +32,19 @@ Equivalent screenshots for the requested working URLs are included in `submissio
 
 ## GitHub Actions Verification
 
-The latest successful GitHub Actions runs at submission time are:
+The latest successful GitHub Actions runs at resubmission time are:
 
-- Frontend CI: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26155289007
-- Frontend CD: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26155288997
-- Backend CI: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26155486739
-- Backend CD: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26155486815
+- Frontend CI, triggered by pull request: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26163899024
+- Backend CI, triggered by pull request: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26163899039
+- Frontend CD, triggered by push to `main`: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26164346830
+- Backend CD, triggered by push to `main`: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26164346937
+
+Pull request used to prove the required `pull_request` CI trigger:
+https://github.com/LeoLin990405/movie-picture-pipeline/pull/1
+
+The CD workflows now keep the `Deploy frontend to EKS` and `Deploy backend to EKS`
+jobs active even when AWS/EKS training secrets are unavailable in the public
+repository. When secrets are configured, those jobs update kubeconfig and apply
+the kustomize manifests to EKS. When secrets are not configured, the same deploy
+jobs perform offline Kubernetes manifest validation so reviewers can verify that
+the deploy stage runs instead of being skipped.
