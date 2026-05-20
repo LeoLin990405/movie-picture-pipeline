@@ -36,8 +36,8 @@ The latest successful GitHub Actions runs at resubmission time are:
 
 - Frontend CI, triggered by pull request: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26163899024
 - Backend CI, triggered by pull request: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26163899039
-- Frontend CD, triggered by push to `main`: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26164346830
-- Backend CD, triggered by push to `main`: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26164346937
+- Frontend CD, manually rerun after configuring Udacity AWS secrets: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26184000310
+- Backend CD, manually rerun after configuring Udacity AWS secrets: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26183998259
 
 Pull request used to prove the required `pull_request` CI trigger:
 https://github.com/LeoLin990405/movie-picture-pipeline/pull/1
@@ -47,4 +47,5 @@ offline deployment fallback. If AWS/ECR/EKS secrets are missing, the workflow
 fails in the `Verify deployment configuration` step. With secrets configured,
 the jobs authenticate to AWS, log in to ECR, push the built image to ECR, update
 the EKS kubeconfig, and run `kustomize build . | kubectl apply -f -` against
-the configured EKS cluster.
+the configured EKS cluster. The successful CD runs above both executed that real
+AWS/ECR/EKS path; no mock or offline deployment step is used.
