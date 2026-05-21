@@ -83,8 +83,6 @@ jobs:
     defaults:
       run:
         working-directory: starter/frontend
-    outputs:
-      image_uri: ${{ steps.image.outputs.image_uri }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -119,14 +117,14 @@ jobs:
             .
 
       - name: Tag image for ECR
-        id: image
         run: |
           IMAGE_URI="${{ steps.ecr-login.outputs.registry }}/${FRONTEND_ECR_REPOSITORY}:${{ github.sha }}"
           docker tag mp-frontend:${{ github.sha }} "$IMAGE_URI"
-          echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
       - name: Push image to ECR
-        run: docker push "${{ steps.image.outputs.image_uri }}"
+        run: |
+          IMAGE_URI="${{ steps.ecr-login.outputs.registry }}/${FRONTEND_ECR_REPOSITORY}:${{ github.sha }}"
+          docker push "$IMAGE_URI"
 
   deploy:
     name: Deploy frontend to EKS
@@ -158,11 +156,15 @@ jobs:
 
       - name: Deploy frontend manifests
         run: |
-          kustomize edit set image frontend=${{ needs.build.outputs.image_uri }}
+          ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          IMAGE_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${FRONTEND_ECR_REPOSITORY}:${GITHUB_SHA}"
+          kustomize edit set image frontend="$IMAGE_URI"
           kustomize build . | kubectl apply -f -
 
       - name: Verify frontend service URL
         run: |
+          ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          IMAGE_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${FRONTEND_ECR_REPOSITORY}:${GITHUB_SHA}"
           kubectl rollout status deployment/frontend --timeout=180s
           kubectl get pods -l app=frontend -o wide
           kubectl get service frontend -o wide
@@ -192,7 +194,7 @@ jobs:
           {
             echo "### Frontend EKS Deployment Verification"
             echo ""
-            echo "- Image deployed: \`${{ needs.build.outputs.image_uri }}\`"
+            echo "- Image deployed: \`${IMAGE_URI}\`"
             echo "- Frontend service URL: ${FRONTEND_URL}"
             echo ""
             echo '```'
