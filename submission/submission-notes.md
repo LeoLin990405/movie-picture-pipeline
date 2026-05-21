@@ -24,7 +24,14 @@ No AWS credentials are committed to the repository.
 
 ## Working Application Evidence
 
-Equivalent screenshots for the requested working URLs are included in `submission/screenshots/`:
+Direct EKS service URL evidence is included in `submission/eks-service-urls.md`.
+The latest successful CD workflows print the Kubernetes LoadBalancer records and
+the resulting service URLs after deployment:
+
+- Backend service URL: http://a6410d12d710d4b95bb16cad2f0f0a30-1351506007.us-east-1.elb.amazonaws.com/movies
+- Frontend service URL: http://a5182956fcc0d445599f57219e2e4688-1548340538.us-east-1.elb.amazonaws.com
+
+Equivalent screenshots for the working URLs are also included in `submission/screenshots/`:
 
 - `backend-api-movies.png` shows the backend `/movies` endpoint returning the list of movies.
 - `frontend-movie-list.png` shows the frontend rendering the movie list returned by the backend.
@@ -36,8 +43,8 @@ The latest successful GitHub Actions runs at resubmission time are:
 
 - Frontend CI, triggered by pull request: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26163899024
 - Backend CI, triggered by pull request: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26163899039
-- Frontend CD, manually rerun after configuring Udacity AWS secrets: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26184000310
-- Backend CD, manually rerun after configuring Udacity AWS secrets: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26183998259
+- Frontend CD, manually rerun after configuring Udacity AWS secrets and service URL verification: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26204010471
+- Backend CD, manually rerun after configuring Udacity AWS secrets and service URL verification: https://github.com/LeoLin990405/movie-picture-pipeline/actions/runs/26203944204
 
 Pull request used to prove the required `pull_request` CI trigger:
 https://github.com/LeoLin990405/movie-picture-pipeline/pull/1
@@ -48,4 +55,6 @@ fails in the `Verify deployment configuration` step. With secrets configured,
 the jobs authenticate to AWS, log in to ECR, push the built image to ECR, update
 the EKS kubeconfig, and run `kustomize build . | kubectl apply -f -` against
 the configured EKS cluster. The successful CD runs above both executed that real
-AWS/ECR/EKS path; no mock or offline deployment step is used.
+AWS/ECR/EKS path, waited for the deployment to become available, ran
+`kubectl get service`, and printed the service URL from the assigned
+LoadBalancer hostname. No mock or offline deployment step is used.
