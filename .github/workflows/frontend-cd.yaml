@@ -165,7 +165,14 @@ jobs:
         run: |
           ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
           IMAGE_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${FRONTEND_ECR_REPOSITORY}:${GITHUB_SHA}"
-          kubectl rollout status deployment/frontend --timeout=180s
+          if ! kubectl wait --for=condition=Available deployment/frontend --timeout=300s; then
+            kubectl get deployment frontend -o wide
+            kubectl describe deployment frontend
+            kubectl get pods -l app=frontend -o wide
+            kubectl describe pods -l app=frontend
+            kubectl logs -l app=frontend --all-containers --tail=100 || true
+            exit 1
+          fi
           kubectl get pods -l app=frontend -o wide
           kubectl get service frontend -o wide
 
